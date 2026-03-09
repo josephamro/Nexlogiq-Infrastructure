@@ -69,10 +69,12 @@ To ensure zero data loss and minimal Recovery Time Objective (RTO):
 4. The Google Authenticator app installed on your mobile device.
 
 ### Phase 1: Preparation & Execution
+
 1. Clone the repository to your server:
    ```bash
-git clone https://github.com/nexlogiqai/Nexlogiq-Infrastructure.git
-cd Nexlogiq-Infrastructure
+   git clone https://github.com/nexlogiqai/Nexlogiq-Infrastructure.git
+   cd Nexlogiq-Infrastructure
+
    ```
 
 2. Edit the variables at the top of your chosen script (`core-node/provision_core.sh` or `monitor-node/provision_monitor.sh`):
