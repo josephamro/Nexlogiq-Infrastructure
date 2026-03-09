@@ -87,7 +87,7 @@ sed -i "s/^#*ChallengeResponseAuthentication .*/ChallengeResponseAuthentication 
 sed -i "s/^#*KbdInteractiveAuthentication .*/KbdInteractiveAuthentication yes/" /etc/ssh/sshd_config
 
 if ! grep -q "pam_google_authenticator.so" /etc/pam.d/sshd; then
-    echo "auth required pam_google_authenticator.so" >> /etc/pam.d/sshd
+    echo "auth required pam_google_authenticator.so nullok" >> /etc/pam.d/sshd
 fi
 
 # 10. Performance & IPv6 Disable
