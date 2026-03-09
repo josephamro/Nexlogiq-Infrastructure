@@ -1,17 +1,20 @@
 # Nexlogiq AI - Enterprise Distributed Infrastructure Blueprint
 
-
-
 An automated, enterprise-grade Infrastructure as Code (IaC) repository designed to provision, harden, and optimize Linux-based Virtual Private Servers (VPS). Engineered by the **Nexlogiq AI Infrastructure Team**, this blueprint establishes a highly secure, distributed architecture that splits critical application workloads from observability stacks.
+
+---
 
 ## 1. Architecture Overview
 
 This infrastructure strictly adheres to the **NIST SP 800-207 Zero-Trust architecture** and **CIS Benchmarks** for Linux system hardening. It assumes the public internet is a hostile environment and removes reliance on traditional perimeter-only defenses.
 
+
 The repository is divided into two distinct node types:
 
 * **`core-node`**: The primary engine for databases, AI agents, and production applications (e.g., Coolify). Optimized for heavy workloads with an 8GB Swap allocation, TCP BBR network acceleration, and self-healing mechanisms.
 * **`monitor-node`**: An isolated Out-of-Band (OOB) server. Connects to the core node securely via an encrypted tunnel to collect metrics without exposing telemetry to the public internet.
+
+---
 
 ## 2. Core Defense & Performance Features
 
@@ -35,6 +38,7 @@ This blueprint utilizes a dual-layer firewall strategy designed for extreme envi
 ### The "Invisible Node" Strategy
 While the OS-level firewall (UFW) is configured by the script to *allow* the custom SSH port, **the Cloud Provider's Firewall (e.g., Oracle VCN Security Lists) must be configured to DROP all incoming SSH traffic from the public internet (0.0.0.0/0).**
 
+
 By doing this:
 1. The server becomes completely invisible to automated port scanners and botnets.
 2. Administrative SSH access is **only possible** by pinging the internal Tailscale VPN IP (e.g., `100.x.x.x`).
@@ -43,7 +47,7 @@ By doing this:
 In the event of a catastrophic VPN failure where Tailscale goes down globally, administrators are not locked out. The "Break-Glass" recovery process is simple:
 1. Log into the Cloud Provider Console (Oracle Cloud / AWS).
 2. Temporarily open the custom SSH port in the Virtual Cloud Network (VCN) Security Group.
-3. SSH into the server using the Public IP to resolve the VPN issue.
+3. SSH into the server using the **Public IP** to resolve the VPN issue.
 4. Immediately close the VCN port once the VPN is restored to return to the "Invisible" state.
 
 ---
@@ -63,7 +67,7 @@ To ensure zero data loss and minimal Recovery Time Objective (RTO):
 ## 5. Step-by-Step Deployment Guide
 
 ### Prerequisites
-1. A fresh, unmodified installation of **Ubuntu 20.04, 22.04, or 24.04**.
+1. A fresh, unmodified installation of **Ubuntu 22.04 or 24.04**.
 2. Root (`sudo`) access to the server.
 3. An active [Tailscale](https://tailscale.com/) account.
 4. The Google Authenticator app installed on your mobile device.
@@ -72,42 +76,60 @@ To ensure zero data loss and minimal Recovery Time Objective (RTO):
 
 1. Clone the repository to your server:
    ```bash
-   git clone https://github.com/nexlogiqai/Nexlogiq-Infrastructure.git
+   git clone (https://github.com/nexlogiqai/Nexlogiq-Infrastructure.git)
    cd Nexlogiq-Infrastructure
 
-   ```
+```
 
 2. Edit the variables at the top of your chosen script (`core-node/provision_core.sh` or `monitor-node/provision_monitor.sh`):
-   ```bash
-   USER_NAME="nexlogiq_admin"
-   USER_PASS="your_very_secure_password"
-   SSH_PORT=2222 # Choose a non-standard port (e.g., 4422, 5022)
-   ```
+```bash
+USER_NAME="nexlogiq_admin"
+USER_PASS="your_very_secure_password"
+SSH_PORT=2222 # Choose a non-standard port (e.g., 4422, 5022)
+
+```
+
 
 3. Execute the script with root privileges:
-   ```bash
-   sudo bash core-node/provision_core.sh
-   ```
-
-### Phase 2: Post-Deployment Initialization
-**Step 1: Connect via Tailscale IP**
-Ensure your VCN blocks public SSH. SSH into the server using your local Tailscale connection:
 ```bash
-ssh -p <YOUR_CUSTOM_PORT> <USER_NAME>@<TAILSCALE_INTERNAL_IP>
+sudo bash core-node/provision_core.sh
+
 ```
 
-**Step 2: Initialize the VPN (Tailscale)**
-Authenticate the server to your private network:
+
+
+### Phase 2: Post-Deployment Initialization (CRITICAL)
+
+**Step 1: First-Time Login (Public IP)**
+After the reboot, login for the first time using the **Public IP** and your **SSH Private Key**. The script allows a one-time login without MFA via the `nullok` policy:
+
 ```bash
-sudo tailscale up
+ssh -i /path/to/your/private_key.key -p <YOUR_CUSTOM_PORT> <USER_NAME>@<SERVER_PUBLIC_IP>
+
 ```
 
-**Step 3: Setup Multi-Factor Authentication (MFA)**
-Run the PAM module to secure your sessions:
+**Step 2: Setup Multi-Factor Authentication (MFA)**
+Immediately initialize your secondary security layer:
+
 ```bash
 google-authenticator
+
 ```
-*(Answer `y` to all prompts, scan the QR code, and securely store the backup scratch codes).*
+
+*(Answer **y** to all prompts, scan the QR code with your phone, and **securely store** the backup scratch codes).*
+
+**Step 3: Connect to the Private Network (Tailscale)**
+Authenticate the server to your Zero-Trust network:
+
+```bash
+sudo tailscale up
+
+```
+
+*(Follow the generated URL to authorize the node in your Tailscale admin console).*
+
+**Step 4: The "Invisible" Switch**
+Now that you are connected via VPN, go to your Cloud Provider (Oracle/AWS) and **DELETE** the Port Ingress Rule for `<YOUR_CUSTOM_PORT>`. Access is now restricted to Tailscale only.
 
 ---
 
@@ -115,16 +137,25 @@ google-authenticator
 
 Verify the integrity of your newly provisioned node:
 
-* **Check Firewall Rules:** `sudo ufw status verbose`
-* **Check Active Threat Defense:** `sudo cscli metrics`
-* **Check Monit Integrity Status:** `sudo monit status`
-* **Check Docker Daemon:** `docker ps`
+```bash
+# Check Firewall Rules
+sudo ufw status numbered
+
+# Check Active Threat Defense
+sudo cscli metrics
+
+# Check Integrity & Health Status
+sudo monit status
+
+# Check Docker Daemon Logging
+docker info | grep "Logging Driver"
+
+```
 
 ## Legal & Security Disclaimer
 
-This script executes deep system modifications, alters firewall rules, disables default networking protocols (IPv6), and changes authentication mechanisms. **It is strongly advised to read the source code in its entirety before deploying it in a production environment.**
-
-Unauthorized access to nodes provisioned utilizing this architecture is strictly prohibited. All activities are actively logged by `auditd` and monitored by `Monit`.
+This script executes deep system modifications, alters firewall rules, disables default networking protocols (IPv6), and changes authentication mechanisms. **It is strongly advised to read the source code in its entirety before deploying it in a production environment.** Unauthorized access to nodes provisioned utilizing this architecture is strictly prohibited. All activities are actively logged by `auditd`.
 
 ---
+
 **Maintained by Nexlogiq AI** | Infrastructure Engineering Division
