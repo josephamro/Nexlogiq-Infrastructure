@@ -116,12 +116,14 @@ echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
 sysctl -p
 
 # 13. File Integrity Monitoring (Monit)
-# Enable Monit local HTTP interface for 'monit status' command
-sed -i 's/^# set httpd port 2812 and/set httpd port 2812 and/' /etc/monit/monitrc
-sed -i 's/^# *use address localhost/    use address localhost/' /etc/monit/monitrc
-sed -i 's/^# *allow localhost/    allow localhost/' /etc/monit/monitrc
-
+# Using Append method to ensure HTTP interface is enabled regardless of config formatting
 cat <<EOF >> /etc/monit/monitrc
+
+# Nexlogiq AI Monitoring Rules
+set httpd port 2812 and
+    use address localhost
+    allow localhost
+
 check file passwd with path /etc/passwd
     if changed sha1 checksum then alert
 check file sshd_config with path /etc/ssh/sshd_config
