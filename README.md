@@ -47,12 +47,12 @@ While UFW handles OS-level ports, your public IP remains vulnerable to direct DD
 ```bash
 #!/bin/bash
 # Allow IPv4 from Cloudflare
-for ip in $(curl -s [https://www.cloudflare.com/ips-v4](https://www.cloudflare.com/ips-v4)); do
+for ip in $(curl -s https://www.cloudflare.com/ips-v4); do
     sudo ufw allow proto tcp from $ip to any port 80,443 comment 'Cloudflare IP'
 done
 
 # Allow IPv6 from Cloudflare
-for ip in $(curl -s [https://www.cloudflare.com/ips-v6](https://www.cloudflare.com/ips-v6)); do
+for ip in $(curl -s https://www.cloudflare.com/ips-v6); do
     sudo ufw allow proto tcp from $ip to any port 80,443 comment 'Cloudflare IP'
 done
 
