@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # ==============================================================================
-# Nexlogiq AI - Out-of-Band Monitoring Node Provisioning
+# Nexlogiq AI - Out-of-Band Monitoring Node Provisioning (v1.1 Stable)
 # ==============================================================================
 # Description: Automates the deployment of a secure monitoring server.
-# Architecture: Zero-Trust, Docker-Ready, Optimized for Observability Stack.
+# Architecture: Zero-Trust, MFA-Hardened, Optimized for Observability Stack.
 # Author: Nexlogiq AI Infrastructure Team
 # ==============================================================================
 
@@ -79,13 +79,19 @@ ufw allow $SSH_PORT/tcp
 ufw allow in on tailscale0
 echo "y" | ufw enable
 
-# 9. SSH Hardening & MFA
+# 9. SSH Hardening & MFA (FIXED: Enforce Key + Google Auth)
 sed -i "s/^#*Port .*/Port $SSH_PORT/" /etc/ssh/sshd_config
 sed -i "s/^#*PermitRootLogin .*/PermitRootLogin no/" /etc/ssh/sshd_config
 sed -i "s/^#*PasswordAuthentication .*/PasswordAuthentication no/" /etc/ssh/sshd_config
 sed -i "s/^#*ChallengeResponseAuthentication .*/ChallengeResponseAuthentication yes/" /etc/ssh/sshd_config
 sed -i "s/^#*KbdInteractiveAuthentication .*/KbdInteractiveAuthentication yes/" /etc/ssh/sshd_config
 
+# Force SSH to require BOTH public key and interactive auth (MFA)
+if ! grep -q "AuthenticationMethods" /etc/ssh/sshd_config; then
+    echo "AuthenticationMethods publickey,keyboard-interactive" >> /etc/ssh/sshd_config
+fi
+
+# Add PAM rule (nullok allows first login without MFA to set it up)
 if ! grep -q "pam_google_authenticator.so" /etc/pam.d/sshd; then
     echo "auth required pam_google_authenticator.so nullok" >> /etc/pam.d/sshd
 fi
@@ -139,7 +145,7 @@ EOF
 systemctl restart monit
 
 # ==============================================================================
-# 14. Automated Observability Stack Deployment (Dynamic Discovery & Limits)
+# 14. Automated Observability Stack Deployment
 # ==============================================================================
 echo "[INFO] Deploying Observability Stack..."
 OBS_DIR="/home/$USER_NAME/observability"
@@ -237,10 +243,18 @@ volumes:
   uptime-kuma_data:
 EOF
 
-chown -R $USER_NAME:$USER_NAME $OBS_DIR
+# FIX: Grant Prometheus user (UID 65534) access to read the targets file
+chown -R 65534:65534 $OBS_DIR/prometheus
+chmod -R 755 $OBS_DIR/prometheus
+chown $USER_NAME:$USER_NAME $OBS_DIR/docker-compose.yml
+
+# FIX: Wait for Docker daemon to fully initialize before composing
+echo "[INFO] Waiting for Docker daemon to stabilize..."
+sleep 10
+
 cd $OBS_DIR
 docker compose up -d
-echo "[SUCCESS] Observability Stack is running with limits and dynamic discovery!"
+echo "[SUCCESS] Observability Stack is running!"
 
 # ==============================================================================
 # 15. Restricted Enterprise MOTD Branding
@@ -249,10 +263,10 @@ chmod -x /etc/update-motd.d/* 2>/dev/null
 cat << 'EOF' > /etc/update-motd.d/99-nexlogiq
 #!/bin/sh
 echo "========================================================================"
-echo "  _   _ _______   ___       ____   _____ _____  ___         /\   |_   _| "
-echo " | \ | |  ___\ \ / / |     / __ \ / ____|_   _|/ _ \       /  \    | |   "
-echo " |  \| | |__  \ V /| |    | |  | | |  __  | | | | | |     / /\ \   | |   "
-echo " | . \` |  __|  > < | |    | |  | | | |_ | | | | | | |    / ____ \  | |   "
+echo "  _    _ _______   ___        ____   _____ _____  ___         /\    |_   _| "
+echo " | \ | |  ___\ \ / / |      / __ \ / ____|_   _|/ _ \       /  \    | |   "
+echo " |  \| | |__  \ V /| |     | |  | | |  __  | | | | | |     / /\ \   | |   "
+echo " | . \` |  __|  > < | |     | |  | | | |_ | | | | | | |    / ____ \  | |   "
 echo " | |\  | |____/ . \| |____| |__| | |__| |_| |_| |_| |   /_/    \_\_| |_  "
 echo " |_| \_|______/_/ \_\______\____/ \_____|____ |\__\_\            |_____| "
 echo "========================================================================"
